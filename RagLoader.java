@@ -1,19 +1,18 @@
 package dev.datainmotion;
 
-import io.milvus.v2.client.*;
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import io.milvus.v2.client.ConnectConfig;
+import io.milvus.v2.client.MilvusClientV2;
 import io.milvus.v2.common.ConsistencyLevel;
-import io.milvus.v2.service.collection.request.CreateCollectionReq;
-import io.milvus.v2.service.vector.request.*;
-import io.milvus.v2.service.vector.response.*;
-import java.util.*;
-import com.google.gson.*;
-import io.milvus.v2.client.*;
-import io.milvus.v2.common.ConsistencyLevel;
-import io.milvus.v2.service.collection.request.CreateCollectionReq;
-import io.milvus.v2.service.collection.request.DropCollectionReq;
-import io.milvus.v2.service.vector.request.*;
-import io.milvus.v2.service.vector.request.data.FloatVec;
-import io.milvus.v2.service.vector.response.*;
+import io.milvus.v2.service.vector.request.InsertReq;
+import io.milvus.v2.service.vector.request.QueryReq;
+import io.milvus.v2.service.vector.response.InsertResp;
+import io.milvus.v2.service.vector.response.QueryResp;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 /**
  *
@@ -28,34 +27,43 @@ public class RagLoader {
     private static final String VECTOR_FIELD = "vector";
     private static final String JSON_FIELD = "metadata";
     private static final String MILVUS_HOST = "http://192.168.1.166:19530";
+    private static final String collectionName = "aircraftrag";
+    private static final String sourceCollectionName = "liveplanes";
+    public static final String FILTER = "flightidentifier != 'NA' ";
 
     /**
      * @TODO:   move constants
      * @param args
      */
     public static void main(String[] args) {
+        loader();
+        System.exit(0);
+    }
+
+    /**
+     * search from liveplanes collection and insert matching into special RAG collection
+     */
+    private static void loader() {
         ConnectConfig config = ConnectConfig.builder()
                 .uri(MILVUS_HOST)
                 .build();
         MilvusClientV2 client = new MilvusClientV2(config);
 
-        String collectionName = "aircraftrag";
-        String sourceCollectionName = "liveplanes";
-
-        List<String> fields = Arrays.asList("id","details","plane_text_vector","icao","geometricaltitude","groundspeed", "latitude",
-                "longitude","flightidentifier");
+        List<String> fields = Arrays.asList("id","details","plane_text_vector","icao","geometricaltitude",
+                "groundspeed", "latitude", "longitude","flightidentifier");
 
         QueryResp insertList = client.query(QueryReq.builder()
                 .collectionName(sourceCollectionName)
-                .filter("flightidentifier != 'NA' ")
+                .filter(FILTER)
                 .outputFields(fields)
                 .consistencyLevel(ConsistencyLevel.EVENTUALLY)
-                .limit(500L)
+                .limit(2500L)
                 .build());
 
         List<JsonObject> rows = new ArrayList<>();
         Gson gson = new Gson();
 
+        // Copy from liveplanes to RAG
         for (QueryResp.QueryResult result : insertList.getQueryResults()) {
             JsonObject metadata = new JsonObject();
             metadata.addProperty("icao", String.valueOf( result.getEntity().getOrDefault("icao","NA") ));
@@ -80,6 +88,5 @@ public class RagLoader {
         System.out.printf("%d rows inserted\n", insertR.getInsertCnt());
 
         client.close();
-        System.exit(0);
     }
 }
