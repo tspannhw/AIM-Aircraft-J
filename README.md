@@ -1,6 +1,7 @@
 # AIM-Aircraft-J
 AI - Milvus - Ollama - LangChain4J - Milvus Java SDK
 
+![image](https://github.com/user-attachments/assets/f1b123dc-b407-49be-b960-73a82eaa86ae)
 
 ### Example Runs
 
